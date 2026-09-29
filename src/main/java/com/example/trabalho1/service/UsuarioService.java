@@ -1,7 +1,7 @@
 package com.example.trabalho1.service;
 
-import java.util.List;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -37,10 +37,9 @@ public class UsuarioService {
         return UsuarioResponseDTO.fromEntity(usuarioRepository.save(usuario));
     }
 
-    public List<UsuarioResponseDTO> listarTodos() {
-        return usuarioRepository.findAll().stream()
-                .map(UsuarioResponseDTO::fromEntity)
-                .toList();
+    public Page<UsuarioResponseDTO> listarTodos(Pageable pageable) {
+        return usuarioRepository.findAll(pageable)
+                .map(UsuarioResponseDTO::fromEntity);
     }
 
     public UsuarioResponseDTO buscarPorId(Long id) {

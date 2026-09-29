@@ -9,6 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +18,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -70,6 +75,18 @@ class UsuarioServiceTest {
         assertThat(resultado.id()).isEqualTo(1L);
         assertThat(resultado.email()).isEqualTo("bernardo@vapor.com");
         verify(passwordEncoder).encode("senha123");
+    }
+
+    @Test
+    void deveListarUsuariosPaginados() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Usuario> pagina = new PageImpl<>(List.of(usuarioExistente), pageable, 1);
+        when(usuarioRepository.findAll(pageable)).thenReturn(pagina);
+
+        Page<UsuarioResponseDTO> resultado = usuarioService.listarTodos(pageable);
+
+        assertThat(resultado.getTotalElements()).isEqualTo(1);
+        assertThat(resultado.getContent().get(0).email()).isEqualTo("bernardo@vapor.com");
     }
 
     @Test
