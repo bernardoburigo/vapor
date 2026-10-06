@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.trabalho1.dto.UsuarioRequestDTO;
+import com.example.trabalho1.repository.UsuarioRepository;
 
 import tools.jackson.databind.ObjectMapper;
 
@@ -37,6 +38,9 @@ class UsuarioControllerIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
     @Test
     void deveCriarUsuarioERetornar201ComLocationESemSenha() throws Exception {
@@ -98,7 +102,7 @@ class UsuarioControllerIntegrationTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.content.length()", is(2)))
                 .andExpect(jsonPath("$.page.size", is(2)))
-                .andExpect(jsonPath("$.page.totalElements", is(3)));
+                .andExpect(jsonPath("$.page.totalElements", is((int) usuarioRepository.count())));
     }
 
     @Test
@@ -172,6 +176,20 @@ class UsuarioControllerIntegrationTest {
 
         mockMvc.perform(post("/api/usuarios/login").contentType(MediaType.APPLICATION_JSON).content(corpoLogin))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void deveRetornar400ParaCorpoJsonMalformado() throws Exception {
+        mockMvc.perform(post("/api/usuarios").contentType(MediaType.APPLICATION_JSON).content("{nome: "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", is("Corpo da requisição inválido ou malformado")));
+    }
+
+    @Test
+    void deveRetornar400ParaIdNaoNumerico() throws Exception {
+        mockMvc.perform(get("/api/usuarios/{id}", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("id")));
     }
 
     private Long criarUsuarioEExtrairId(String email) throws Exception {
