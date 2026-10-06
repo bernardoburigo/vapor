@@ -1,0 +1,23 @@
+name: vapor
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: vapor-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: trabalho1
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - vapor-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d trabalho1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  vapor-postgres-data:
