@@ -9,4 +9,6 @@ import com.example.trabalho1.entity.Jogo;
  * Declarado aqui para satisfazer a injeção em AvaliacaoService.
  */
 public interface JogoRepository extends JpaRepository<Jogo, Long> {
+
+    boolean existsByDesenvolvedoraId(Long desenvolvedoraId);
 }
