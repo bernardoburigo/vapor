@@ -35,6 +35,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springdoc.core.annotations.ParameterObject;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -67,6 +68,16 @@ public class UsuarioController {
 
     private static final String EXEMPLO_ERRO_ACESSO_NEGADO = """
             {"timestamp": "2026-10-06T14:30:00", "status": 403, "error": "Forbidden", "message": "Acesso negado: seu perfil não tem permissão para este recurso", "fieldErrors": null}
+            """;
+
+    // Credenciais de DESENVOLVIMENTO (as mesmas do README), para o login funcionar com um clique em Execute.
+    // O USER de demonstração só existe depois de rodar `npm run seed` no frontend. Remova em produção.
+    private static final String EXEMPLO_LOGIN_ADMIN = """
+            {"email": "admin@vapor.com", "senha": "admin123"}
+            """;
+
+    private static final String EXEMPLO_LOGIN_USER = """
+            {"email": "ana.demo@vapor.com", "senha": "demo1234"}
             """;
 
     private static final String EXEMPLO_LOGIN = """
@@ -121,7 +132,7 @@ public class UsuarioController {
     })
     @GetMapping
     public ResponseEntity<Page<UsuarioResponseDTO>> listarTodos(
-            @PageableDefault(size = 20, sort = "nome") Pageable pageable) {
+            @ParameterObject @PageableDefault(size = 20, sort = "nome") Pageable pageable) {
         return ResponseEntity.ok(usuarioService.listarTodos(pageable));
     }
 
@@ -148,7 +159,7 @@ public class UsuarioController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<UsuarioResponseDTO> buscarPorId(
-            @Parameter(description = "Identificador do usuário", example = "1") @PathVariable Long id) {
+            @Parameter(description = "Identificador do usuário") @PathVariable Long id) {
         return ResponseEntity.ok(usuarioService.buscarPorId(id));
     }
 
@@ -183,7 +194,7 @@ public class UsuarioController {
     })
     @PutMapping("/{id}")
     public ResponseEntity<UsuarioResponseDTO> atualizar(
-            @Parameter(description = "Identificador do usuário", example = "1") @PathVariable Long id,
+            @Parameter(description = "Identificador do usuário") @PathVariable Long id,
             @Valid @RequestBody UsuarioUpdateRequestDTO dto) {
         return ResponseEntity.ok(usuarioService.atualizar(id, dto));
     }
@@ -211,7 +222,7 @@ public class UsuarioController {
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(
-            @Parameter(description = "Identificador do usuário", example = "1") @PathVariable Long id) {
+            @Parameter(description = "Identificador do usuário") @PathVariable Long id) {
         usuarioService.deletar(id);
         return ResponseEntity.noContent().build();
     }
@@ -233,6 +244,11 @@ public class UsuarioController {
                             schema = @Schema(implementation = ErrorResponse.class),
                             examples = @ExampleObject(name = "Credenciais inválidas", value = EXEMPLO_ERRO_CREDENCIAIS)))
     })
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = @Content(mediaType = "application/json", examples = {
+                    @ExampleObject(name = "ADMIN (demonstração)", value = EXEMPLO_LOGIN_ADMIN),
+                    @ExampleObject(name = "USER (demonstração)", value = EXEMPLO_LOGIN_USER)
+            }))
     @PostMapping("/login")
     public ResponseEntity<AuthResponseDTO> login(@Valid @RequestBody LoginRequestDTO dto) {
         return ResponseEntity.ok(usuarioService.login(dto));

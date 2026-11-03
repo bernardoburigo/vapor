@@ -65,9 +65,9 @@ public class DesenvolvedoraController {
                     + "Se os dois forem enviados, vale o nome. Endpoint público.")
     @GetMapping
     public ResponseEntity<List<DesenvolvedoraResponseDTO>> listar(
-            @Parameter(description = "Parte do nome", example = "valve")
+            @Parameter(description = "Parte do nome. Ex.: valve")
             @RequestParam(required = false) String nome,
-            @Parameter(description = "País de origem (igualdade, sem diferenciar maiúsculas)", example = "Estados Unidos")
+            @Parameter(description = "País de origem (igualdade, sem diferenciar maiúsculas). Ex.: Estados Unidos")
             @RequestParam(required = false) String paisOrigem) {
         return ResponseEntity.ok(desenvolvedoraService.listar(nome, paisOrigem));
     }
@@ -80,7 +80,7 @@ public class DesenvolvedoraController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<DesenvolvedoraResponseDTO> buscarPorId(
-            @Parameter(description = "Identificador da desenvolvedora", example = "1") @PathVariable Long id) {
+            @Parameter(description = "Identificador da desenvolvedora") @PathVariable Long id) {
         return ResponseEntity.ok(desenvolvedoraService.buscarPorId(id));
     }
 
@@ -101,7 +101,7 @@ public class DesenvolvedoraController {
     })
     @PutMapping("/{id}")
     public ResponseEntity<DesenvolvedoraResponseDTO> atualizar(
-            @Parameter(description = "Identificador da desenvolvedora", example = "1") @PathVariable Long id,
+            @Parameter(description = "Identificador da desenvolvedora") @PathVariable Long id,
             @Valid @RequestBody DesenvolvedoraRequestDTO dto) {
         return ResponseEntity.ok(desenvolvedoraService.atualizar(id, dto));
     }
@@ -122,7 +122,7 @@ public class DesenvolvedoraController {
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(
-            @Parameter(description = "Identificador da desenvolvedora", example = "1") @PathVariable Long id) {
+            @Parameter(description = "Identificador da desenvolvedora") @PathVariable Long id) {
         desenvolvedoraService.deletar(id);
         return ResponseEntity.noContent().build();
     }

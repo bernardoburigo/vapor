@@ -266,6 +266,14 @@ class UsuarioControllerIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void listagemDeUsuariosComOrdenacaoInvalidaRetorna400() throws Exception {
+        mockMvc.perform(get("/api/usuarios").param("sort", "naoexiste")
+                        .header(HttpHeaders.AUTHORIZATION, admin.bearer()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("ordenação")));
+    }
+
     // -------------------------------------------------------------------------
     // login
     // -------------------------------------------------------------------------

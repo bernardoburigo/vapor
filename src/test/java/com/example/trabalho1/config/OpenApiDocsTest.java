@@ -138,4 +138,39 @@ class OpenApiDocsTest {
                 .andExpect(jsonPath("$.components.schemas.JogoResponseDTO.properties.notaMedia").exists())
                 .andExpect(jsonPath("$.components.schemas.JogoResponseDTO.properties.totalAvaliacoes").exists());
     }
+
+    @Test
+    void listagensPaginadasExpoemPageSizeESortNoLugarDeUmObjetoPageable() throws Exception {
+        for (String listagem : new String[] {"/api/jogos", "/api/usuarios"}) {
+            String base = "$.paths['" + listagem + "'].get.parameters";
+            mockMvc.perform(get("/v3/api-docs"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath(base + "[?(@.name=='page')]").isNotEmpty())
+                    .andExpect(jsonPath(base + "[?(@.name=='size')]").isNotEmpty())
+                    .andExpect(jsonPath(base + "[?(@.name=='sort')]").isNotEmpty())
+                    .andExpect(jsonPath(base + "[?(@.name=='pageable')]").isEmpty());
+        }
+    }
+
+    @Test
+    void parametrosNaoVemPreenchidosComExemploParaNaoSeremEnviadosSemQuerer() throws Exception {
+        // O Swagger UI copia "example" de parâmetro para o campo; um DELETE com id pré-preenchido é um risco ao vivo.
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/jogos'].get.parameters[?(@.name=='categoriaId')].example").isEmpty())
+                .andExpect(jsonPath("$.paths['/api/jogos'].get.parameters[?(@.name=='titulo')].example").isEmpty())
+                .andExpect(jsonPath("$.paths['/api/jogos/{id}'].delete.parameters[?(@.name=='id')].example").isEmpty())
+                .andExpect(jsonPath("$.paths['/api/usuarios/{id}'].delete.parameters[?(@.name=='id')].example").isEmpty())
+                .andExpect(jsonPath("$.paths['/api/avaliacoes/{id}'].delete.parameters[?(@.name=='id')].example").isEmpty());
+    }
+
+    @Test
+    void loginOfereceExemplosProntosDeAdminEUser() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/usuarios/login'].post.requestBody.content['application/json']"
+                        + ".examples['ADMIN (demonstração)']").exists())
+                .andExpect(jsonPath("$.paths['/api/usuarios/login'].post.requestBody.content['application/json']"
+                        + ".examples['USER (demonstração)']").exists());
+    }
 }

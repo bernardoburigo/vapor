@@ -74,9 +74,9 @@ public class AvaliacaoController {
     })
     @GetMapping
     public ResponseEntity<List<AvaliacaoResponseDTO>> listarTodas(
-            @Parameter(description = "Filtra pelo jogo", example = "1")
+            @Parameter(description = "Filtra pelo jogo. Ex.: 1")
             @RequestParam(required = false) Long jogoId,
-            @Parameter(description = "Filtra pelo autor da avaliação", example = "1")
+            @Parameter(description = "Filtra pelo autor da avaliação. Ex.: 1")
             @RequestParam(required = false) Long usuarioId) {
 
         if (jogoId != null) {
@@ -96,7 +96,7 @@ public class AvaliacaoController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<AvaliacaoResponseDTO> buscarPorId(
-            @Parameter(description = "Identificador da avaliação", example = "1") @PathVariable Long id) {
+            @Parameter(description = "Identificador da avaliação") @PathVariable Long id) {
         return ResponseEntity.ok(avaliacaoService.buscarPorId(id));
     }
 
@@ -116,7 +116,7 @@ public class AvaliacaoController {
     })
     @PutMapping("/{id}")
     public ResponseEntity<AvaliacaoResponseDTO> atualizar(
-            @Parameter(description = "Identificador da avaliação", example = "1") @PathVariable Long id,
+            @Parameter(description = "Identificador da avaliação") @PathVariable Long id,
             @Valid @RequestBody AvaliacaoUpdateRequestDTO dto,
             @AuthenticationPrincipal UsuarioPrincipal usuarioLogado) {
         return ResponseEntity.ok(avaliacaoService.atualizar(id, dto, usuarioLogado));
@@ -136,7 +136,7 @@ public class AvaliacaoController {
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(
-            @Parameter(description = "Identificador da avaliação", example = "1") @PathVariable Long id,
+            @Parameter(description = "Identificador da avaliação") @PathVariable Long id,
             @AuthenticationPrincipal UsuarioPrincipal usuarioLogado) {
         avaliacaoService.deletar(id, usuarioLogado);
         return ResponseEntity.noContent().build();

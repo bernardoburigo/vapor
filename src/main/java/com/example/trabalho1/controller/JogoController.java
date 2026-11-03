@@ -29,6 +29,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springdoc.core.annotations.ParameterObject;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -66,13 +67,13 @@ public class JogoController {
                     + "sort (padrão titulo,asc). Endpoint público.")
     @GetMapping
     public ResponseEntity<Page<JogoResponseDTO>> listar(
-            @Parameter(description = "Filtra pela categoria", example = "1")
+            @Parameter(description = "Filtra pela categoria. Ex.: 1")
             @RequestParam(required = false) Long categoriaId,
-            @Parameter(description = "Filtra pela desenvolvedora", example = "1")
+            @Parameter(description = "Filtra pela desenvolvedora. Ex.: 1")
             @RequestParam(required = false) Long desenvolvedoraId,
-            @Parameter(description = "Parte do título (sem diferenciar maiúsculas)", example = "half")
+            @Parameter(description = "Parte do título (sem diferenciar maiúsculas). Ex.: half")
             @RequestParam(required = false) String titulo,
-            @PageableDefault(size = 20, sort = "titulo") Pageable pageable) {
+            @ParameterObject @PageableDefault(size = 20, sort = "titulo") Pageable pageable) {
         return ResponseEntity.ok(jogoService.listar(categoriaId, desenvolvedoraId, titulo, pageable));
     }
 
@@ -85,7 +86,7 @@ public class JogoController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<JogoResponseDTO> buscarPorId(
-            @Parameter(description = "Identificador do jogo", example = "1") @PathVariable Long id) {
+            @Parameter(description = "Identificador do jogo") @PathVariable Long id) {
         return ResponseEntity.ok(jogoService.buscarPorId(id));
     }
 
@@ -105,7 +106,7 @@ public class JogoController {
     })
     @PutMapping("/{id}")
     public ResponseEntity<JogoResponseDTO> atualizar(
-            @Parameter(description = "Identificador do jogo", example = "1") @PathVariable Long id,
+            @Parameter(description = "Identificador do jogo") @PathVariable Long id,
             @Valid @RequestBody JogoRequestDTO dto) {
         return ResponseEntity.ok(jogoService.atualizar(id, dto));
     }
@@ -126,7 +127,7 @@ public class JogoController {
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(
-            @Parameter(description = "Identificador do jogo", example = "1") @PathVariable Long id) {
+            @Parameter(description = "Identificador do jogo") @PathVariable Long id) {
         jogoService.deletar(id);
         return ResponseEntity.noContent().build();
     }

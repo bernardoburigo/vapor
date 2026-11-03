@@ -112,6 +112,25 @@ Regras de negócio:
 - Não é possível remover (**409**) uma desenvolvedora ou categoria que tenha jogos, um jogo que tenha avaliações, nem um usuário que tenha avaliações.
 - Nomes de desenvolvedoras e de categorias são únicos, sem diferenciar maiúsculas de minúsculas. E-mails são guardados em minúsculas.
 
+## Testando pelo Swagger (passo a passo)
+
+O Swagger UI fica em http://localhost:8081/swagger-ui/index.html e documenta os 26 endpoints, agrupados por recurso (Jogos, Categorias, Desenvolvedoras, Avaliações e Usuários). Um **cadeado** ao lado do endpoint indica que ele exige token; sem cadeado, o endpoint é público.
+
+1. **Endpoint público.** Abra `GET /api/jogos`, clique em **Try it out** e depois em **Execute**. Os valores padrão (`page=0`, `size=20`, `sort=titulo,ASC`) já funcionam. Os filtros (`categoriaId`, `desenvolvedoraId`, `titulo`) começam vazios.
+2. **Login.** Abra `POST /api/usuarios/login` e clique em **Try it out**. No seletor **Examples**, acima do corpo, escolha `ADMIN (demonstração)` ou `USER (demonstração)` e clique em **Execute**. Copie o valor de `token` da resposta, sem as aspas.
+3. **Authorize.** Clique em **Authorize** (canto superior direito), cole **só o token** (o Swagger acrescenta o `Bearer `), clique em **Authorize** e depois em **Close**. A partir daí, todas as requisições levam o header `Authorization`.
+4. **Endpoints protegidos.** Com o token de ADMIN: `GET /api/usuarios` retorna 200. Para criar, use `POST /api/categorias`, `POST /api/desenvolvedoras` e `POST /api/jogos` (os exemplos de corpo trazem ids ilustrativos: troque pelos ids reais que aparecem em `GET /api/categorias` e `GET /api/desenvolvedoras`).
+5. **Mostrar o 403.** Faça login com `USER (demonstração)`, clique em **Authorize**, depois em **Logout**, cole o novo token e confirme. Agora `POST /api/categorias` e `GET /api/usuarios` retornam **403**.
+6. **Mostrar o 401.** Em **Authorize**, clique em **Logout** e execute `GET /api/usuarios`: retorna **401**.
+
+Observações:
+
+- Os campos `id` dos endpoints de `GET`, `PUT` e `DELETE` por id começam **vazios** de propósito, para um `DELETE` não sair executando sobre um id qualquer. Pegue o id na listagem correspondente.
+- O token vale 60 minutos; depois disso as chamadas protegidas voltam a dar 401 e é preciso fazer login de novo.
+- O `USER (demonstração)` (`ana.demo@vapor.com`) só existe depois de rodar `npm run seed` no [frontend](frontend/README.md). Sem o seed, cadastre um usuário em `POST /api/usuarios` e use-o no login.
+- Os exemplos de login contêm as credenciais de desenvolvimento do README. **Remova-os em produção** (`UsuarioController`, constantes `EXEMPLO_LOGIN_ADMIN` e `EXEMPLO_LOGIN_USER`).
+- Se mudou o código do backend, reinicie a aplicação para o Swagger refletir a mudança.
+
 ## Exemplos de requisições e respostas
 
 ### Login

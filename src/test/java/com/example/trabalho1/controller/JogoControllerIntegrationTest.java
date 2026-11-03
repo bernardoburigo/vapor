@@ -275,6 +275,33 @@ class JogoControllerIntegrationTest {
         mockMvc.perform(get("/api/desenvolvedoras")).andExpect(status().isOk());
     }
 
+    @Test
+    void ordenacaoPorPropriedadeInexistenteRetorna400EmVezDe500() throws Exception {
+        // É exatamente o que o Swagger UI mandava por padrão: sort=["string"].
+        mockMvc.perform(get("/api/jogos").param("sort", "[\"string\"]"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.startsWith("Parâmetro de ordenação inválido")));
+
+        mockMvc.perform(get("/api/jogos").param("sort", "naoexiste,desc"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void ordenacaoETamanhoDePaginaValidosFuncionam() throws Exception {
+        Desenvolvedora dev = criarDesenvolvedora();
+        Categoria cat = criarCategoria();
+        criarJogoViaApi("Barato", dev.getId(), cat.getId());
+        criarJogoViaApi("Caro", dev.getId(), cat.getId());
+
+        mockMvc.perform(get("/api/jogos")
+                        .param("desenvolvedoraId", dev.getId().toString())
+                        .param("size", "1").param("sort", "titulo,desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.size", is(1)))
+                .andExpect(jsonPath("$.page.totalElements", is(2)))
+                .andExpect(jsonPath("$.content[0].titulo", is("Caro")));
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------

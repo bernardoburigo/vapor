@@ -4,6 +4,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
+import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -113,6 +115,29 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleMediaTypeNotAcceptable(HttpMediaTypeNotAcceptableException ex) {
         // Sem corpo JSON: o cliente pediu um formato que a API não produz.
         return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).build();
+    }
+
+    // Ordenação por uma propriedade que não existe (ex.: ?sort=naoexiste,asc) é erro do cliente, não do servidor.
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidSortProperty(PropertyReferenceException ex) {
+        return ordenacaoInvalida("a propriedade '%s' não existe".formatted(ex.getPropertyName()));
+    }
+
+    @ExceptionHandler(InvalidDataAccessApiUsageException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidDataAccess(InvalidDataAccessApiUsageException ex) {
+        if (ex.getCause() instanceof PropertyReferenceException causa) {
+            return handleInvalidSortProperty(causa);
+        }
+        if (ex.getMessage() != null && ex.getMessage().contains("Sort expression")) {
+            return ordenacaoInvalida("use uma propriedade existente do recurso, no formato sort=propriedade,asc");
+        }
+        return handleGenericException(ex);
+    }
+
+    private ResponseEntity<ErrorResponse> ordenacaoInvalida(String detalhe) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(), HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                "Parâmetro de ordenação inválido: " + detalhe));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

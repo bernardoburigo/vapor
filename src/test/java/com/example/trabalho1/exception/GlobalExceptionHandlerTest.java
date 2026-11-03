@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -87,5 +88,22 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<ErrorResponse> resposta = handler.handleAuthentication(new BadCredentialsException("x"));
 
         assertThat(resposta.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void ordenacaoPorPropriedadeInexistenteDeveRetornar400() {
+        ResponseEntity<ErrorResponse> resposta = handler.handleInvalidDataAccess(new InvalidDataAccessApiUsageException(
+                "Sort expression '[\"string\"]: ASC' must only contain property references or aliases"));
+
+        assertThat(resposta.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resposta.getBody().message()).startsWith("Parâmetro de ordenação inválido");
+    }
+
+    @Test
+    void outroUsoInvalidoDoBancoContinuaSendoErroInterno() {
+        ResponseEntity<ErrorResponse> resposta =
+                handler.handleInvalidDataAccess(new InvalidDataAccessApiUsageException("outro problema qualquer"));
+
+        assertThat(resposta.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }

@@ -62,7 +62,7 @@ public class CategoriaController {
             description = "Lista todas as categorias, ou filtra por parte do nome (?nome=). Endpoint público.")
     @GetMapping
     public ResponseEntity<List<CategoriaResponseDTO>> listar(
-            @Parameter(description = "Parte do nome da categoria", example = "RP")
+            @Parameter(description = "Parte do nome da categoria. Ex.: RP")
             @RequestParam(required = false) String nome) {
         return ResponseEntity.ok(categoriaService.listar(nome));
     }
@@ -75,7 +75,7 @@ public class CategoriaController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<CategoriaResponseDTO> buscarPorId(
-            @Parameter(description = "Identificador da categoria", example = "1") @PathVariable Long id) {
+            @Parameter(description = "Identificador da categoria") @PathVariable Long id) {
         return ResponseEntity.ok(categoriaService.buscarPorId(id));
     }
 
@@ -96,7 +96,7 @@ public class CategoriaController {
     })
     @PutMapping("/{id}")
     public ResponseEntity<CategoriaResponseDTO> atualizar(
-            @Parameter(description = "Identificador da categoria", example = "1") @PathVariable Long id,
+            @Parameter(description = "Identificador da categoria") @PathVariable Long id,
             @Valid @RequestBody CategoriaRequestDTO dto) {
         return ResponseEntity.ok(categoriaService.atualizar(id, dto));
     }
@@ -117,7 +117,7 @@ public class CategoriaController {
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(
-            @Parameter(description = "Identificador da categoria", example = "1") @PathVariable Long id) {
+            @Parameter(description = "Identificador da categoria") @PathVariable Long id) {
         categoriaService.deletar(id);
         return ResponseEntity.noContent().build();
     }
