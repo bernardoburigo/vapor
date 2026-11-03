@@ -4,8 +4,7 @@ API REST da plataforma de distribuição digital de jogos VAPOR, inspirada na St
 
 Stack: Java 21, Spring Boot 4, Spring Data JPA, Spring Security com JWT, PostgreSQL, Flyway, Lombok e Swagger (springdoc).
 
-O planejamento e a modelagem estão em [docs/01-planejamento-e-modelagem.md](docs/01-planejamento-e-modelagem.md). O estado da implementação e o plano de execução estão em [docs/02-status-do-sistema.md](docs/02-status-do-sistema.md) e [docs/03-plano-de-execucao.md](docs/03-plano-de-execucao.md).
-
+O planejamento e a modelagem estão em [docs/01-planejamento-e-modelagem.md](docs/01-planejamento-e-modelagem.md).
 ## Pré-requisitos
 
 - JDK 21 ou superior
@@ -302,7 +301,7 @@ A suíte cobre as regras de negócio dos services (com mocks), os controllers de
 .
 ├── docker-compose.yml            # PostgreSQL 16 para desenvolvimento
 ├── pom.xml
-├── docs/                         # análise, status e plano de execução (+ PDFs do trabalho)
+├── docs/                         # documento de análise e modelagem (requisitos, UML, DER) e enunciado do trabalho
 ├── frontend/                     # loja em React + Vite + Tailwind (veja frontend/README.md)
 └── src
     ├── main
