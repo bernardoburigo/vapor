@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/* Identidade VAPOR: azul-petróleo escuro com assinatura em gradiente ciano -> violeta. */
+@theme {
+  --color-bg: #0e1621;
+  --color-panel: #17212e;
+  --color-panel-2: #1f2c3d;
+  --color-line: #2a3b52;
+  --color-ink: #e6edf5;
+  --color-muted: #8fa3bb;
+  --color-star: #f5c542;
+  --color-cyan: #4cc9f0;
+  --color-violet: #8a6bff;
+  --color-danger: #ff7a90;
+  --color-ok: #3ddc97;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@utility bg-vapor {
+  background-image: linear-gradient(135deg, var(--color-cyan), var(--color-violet));
+}
+
+@utility text-vapor {
+  background-image: linear-gradient(135deg, var(--color-cyan), var(--color-violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Foco sempre visível para navegação por teclado. */
+:focus-visible {
+  outline: 2px solid var(--color-cyan);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -22,6 +22,12 @@ docker compose up -d      # sobe o PostgreSQL
 
 Depois, abra o Swagger UI em http://localhost:8081/swagger-ui/index.html. Para testar os endpoints protegidos: faça login em `POST /api/usuarios/login`, copie o `token`, clique em **Authorize** e cole o token.
 
+Para ver a loja funcionando, suba também o [frontend](frontend/README.md) (precisa do Node 20.19+):
+
+```bash
+cd frontend && npm install && npm run seed && npm run dev   # http://localhost:5173
+```
+
 ## Credenciais
 
 | Para quê | Usuário | Senha |
@@ -278,6 +284,7 @@ A suíte cobre as regras de negócio dos services (com mocks), os controllers de
 ├── docker-compose.yml            # PostgreSQL 16 para desenvolvimento
 ├── pom.xml
 ├── docs/                         # análise, status e plano de execução (+ PDFs do trabalho)
+├── frontend/                     # loja em React + Vite + Tailwind (veja frontend/README.md)
 └── src
     ├── main
     │   ├── java/com/example/trabalho1
@@ -321,13 +328,15 @@ Com `spring-boot:run`, use variáveis de ambiente: propriedades passadas com `-D
 
 ## Frontend
 
-Espaço reservado para o frontend, que ainda não foi iniciado.
+A loja em React que consome esta API está em [`frontend/`](frontend/README.md): catálogo com destaque, filtros e busca, detalhe do jogo com nota média e avaliações, login e cadastro, e um painel de administração (jogos, categorias e desenvolvedoras).
 
 | Item | Situação |
 |---|---|
-| Tecnologia | A definir |
-| Diretório no repositório | A definir |
-| Instalação das dependências | A definir |
-| Execução em desenvolvimento | A definir |
-| URL local | A definir |
-| Integração com a API | A definir (base em `http://localhost:8081/api`; CORS já liberado para as portas 3000, 4200 e 5173) |
+| Tecnologia | React 19 + TypeScript + Vite 7 + Tailwind CSS 4 |
+| Diretório no repositório | `frontend/` |
+| Instalação das dependências | `cd frontend && npm install` (Node 20.19 ou superior) |
+| Dados de demonstração | `npm run seed` (com o backend no ar; pode ser repetido sem duplicar) |
+| Execução em desenvolvimento | `npm run dev` |
+| URL local | http://localhost:5173 (porta liberada no CORS do backend) |
+| Integração com a API | `http://localhost:8081/api`, configurável por `VITE_API_URL` |
+| Logins de demonstração | ADMIN `admin@vapor.com` / `admin123`; USER `ana.demo@vapor.com` / `demo1234` |
