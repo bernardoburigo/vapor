@@ -24,12 +24,14 @@ import com.example.trabalho1.dto.AvaliacaoResponseDTO;
 import com.example.trabalho1.dto.AvaliacaoUpdateRequestDTO;
 import com.example.trabalho1.entity.Avaliacao;
 import com.example.trabalho1.entity.Jogo;
+import com.example.trabalho1.entity.Role;
 import com.example.trabalho1.entity.Usuario;
 import com.example.trabalho1.exception.BusinessException;
 import com.example.trabalho1.exception.ResourceNotFoundException;
 import com.example.trabalho1.repository.AvaliacaoRepository;
 import com.example.trabalho1.repository.JogoRepository;
 import com.example.trabalho1.repository.UsuarioRepository;
+import com.example.trabalho1.security.UsuarioPrincipal;
 
 @ExtendWith(MockitoExtension.class)
 class AvaliacaoServiceTest {
@@ -49,6 +51,7 @@ class AvaliacaoServiceTest {
     private Usuario usuario;
     private Jogo jogo;
     private Avaliacao avaliacaoExistente;
+    private UsuarioPrincipal autor;
 
     @BeforeEach
     void setUp() {
@@ -68,6 +71,8 @@ class AvaliacaoServiceTest {
         avaliacaoExistente.setJogo(jogo);
         avaliacaoExistente.setNota(5);
         avaliacaoExistente.setComentario("Obra-prima!");
+
+        autor = new UsuarioPrincipal(1L, "joao@vapor.com", "hash", Role.USER);
     }
 
     // -------------------------------------------------------------------------
@@ -76,7 +81,7 @@ class AvaliacaoServiceTest {
 
     @Test
     void deveCriarAvaliacaoComSucesso() {
-        AvaliacaoRequestDTO dto = new AvaliacaoRequestDTO(1L, 10L, 5, "Obra-prima!");
+        AvaliacaoRequestDTO dto = new AvaliacaoRequestDTO(10L, 5, "Obra-prima!");
 
         when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
         when(jogoRepository.findById(10L)).thenReturn(Optional.of(jogo));
@@ -87,7 +92,7 @@ class AvaliacaoServiceTest {
             return a;
         });
 
-        AvaliacaoResponseDTO resultado = avaliacaoService.criar(dto);
+        AvaliacaoResponseDTO resultado = avaliacaoService.criar(1L, dto);
 
         assertThat(resultado.id()).isEqualTo(100L);
         assertThat(resultado.nota()).isEqualTo(5);
@@ -97,13 +102,13 @@ class AvaliacaoServiceTest {
 
     @Test
     void deveLancarExcecaoAoCriarAvaliacaoDuplicada() {
-        AvaliacaoRequestDTO dto = new AvaliacaoRequestDTO(1L, 10L, 4, "Bom jogo");
+        AvaliacaoRequestDTO dto = new AvaliacaoRequestDTO(10L, 4, "Bom jogo");
 
         when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
         when(jogoRepository.findById(10L)).thenReturn(Optional.of(jogo));
         when(avaliacaoRepository.existsByUsuarioIdAndJogoId(1L, 10L)).thenReturn(true);
 
-        assertThatThrownBy(() -> avaliacaoService.criar(dto))
+        assertThatThrownBy(() -> avaliacaoService.criar(1L, dto))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
@@ -113,11 +118,11 @@ class AvaliacaoServiceTest {
 
     @Test
     void deveLancarExcecaoAoCriarComUsuarioInexistente() {
-        AvaliacaoRequestDTO dto = new AvaliacaoRequestDTO(99L, 10L, 3, null);
+        AvaliacaoRequestDTO dto = new AvaliacaoRequestDTO(10L, 3, null);
 
         when(usuarioRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> avaliacaoService.criar(dto))
+        assertThatThrownBy(() -> avaliacaoService.criar(99L, dto))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(avaliacaoRepository, never()).save(any());
@@ -125,12 +130,12 @@ class AvaliacaoServiceTest {
 
     @Test
     void deveLancarExcecaoAoCriarComJogoInexistente() {
-        AvaliacaoRequestDTO dto = new AvaliacaoRequestDTO(1L, 99L, 3, null);
+        AvaliacaoRequestDTO dto = new AvaliacaoRequestDTO(99L, 3, null);
 
         when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
         when(jogoRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> avaliacaoService.criar(dto))
+        assertThatThrownBy(() -> avaliacaoService.criar(1L, dto))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(avaliacaoRepository, never()).save(any());
@@ -208,7 +213,7 @@ class AvaliacaoServiceTest {
         when(avaliacaoRepository.save(any(Avaliacao.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        AvaliacaoResponseDTO resultado = avaliacaoService.atualizar(100L, dto);
+        AvaliacaoResponseDTO resultado = avaliacaoService.atualizar(100L, dto, autor);
 
         assertThat(resultado.nota()).isEqualTo(3);
         assertThat(resultado.comentario()).isEqualTo("Ficou cansativo no final");
@@ -223,7 +228,7 @@ class AvaliacaoServiceTest {
 
         when(avaliacaoRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> avaliacaoService.atualizar(999L, dto))
+        assertThatThrownBy(() -> avaliacaoService.atualizar(999L, dto, autor))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(avaliacaoRepository, never()).save(any());
@@ -237,7 +242,7 @@ class AvaliacaoServiceTest {
     void deveDeletarAvaliacaoExistente() {
         when(avaliacaoRepository.findById(100L)).thenReturn(Optional.of(avaliacaoExistente));
 
-        avaliacaoService.deletar(100L);
+        avaliacaoService.deletar(100L, autor);
 
         verify(avaliacaoRepository, times(1)).delete(avaliacaoExistente);
     }
@@ -246,9 +251,62 @@ class AvaliacaoServiceTest {
     void deveLancarExcecaoAoDeletarAvaliacaoInexistente() {
         when(avaliacaoRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> avaliacaoService.deletar(999L))
+        assertThatThrownBy(() -> avaliacaoService.deletar(999L, autor))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(avaliacaoRepository, never()).delete(any());
+    }
+
+    // -------------------------------------------------------------------------
+    // autorização: só o dono ou um ADMIN altera/remove
+    // -------------------------------------------------------------------------
+
+    @Test
+    void deveNegarAtualizacaoDeAvaliacaoDeOutroUsuario() {
+        UsuarioPrincipal outro = new UsuarioPrincipal(2L, "outro@vapor.com", "hash", Role.USER);
+        when(avaliacaoRepository.findById(100L)).thenReturn(Optional.of(avaliacaoExistente));
+
+        assertThatThrownBy(() -> avaliacaoService.atualizar(100L, new AvaliacaoUpdateRequestDTO(1, "Ruim"), outro))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getStatus())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        verify(avaliacaoRepository, never()).save(any());
+        assertThat(avaliacaoExistente.getNota()).isEqualTo(5);
+    }
+
+    @Test
+    void deveNegarRemocaoDeAvaliacaoDeOutroUsuario() {
+        UsuarioPrincipal outro = new UsuarioPrincipal(2L, "outro@vapor.com", "hash", Role.USER);
+        when(avaliacaoRepository.findById(100L)).thenReturn(Optional.of(avaliacaoExistente));
+
+        assertThatThrownBy(() -> avaliacaoService.deletar(100L, outro))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getStatus())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        verify(avaliacaoRepository, never()).delete(any());
+    }
+
+    @Test
+    void devePermitirQueAdminAtualizeAvaliacaoDeOutroUsuario() {
+        UsuarioPrincipal admin = new UsuarioPrincipal(99L, "admin@vapor.com", "hash", Role.ADMIN);
+        when(avaliacaoRepository.findById(100L)).thenReturn(Optional.of(avaliacaoExistente));
+        when(avaliacaoRepository.save(any(Avaliacao.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AvaliacaoResponseDTO resultado =
+                avaliacaoService.atualizar(100L, new AvaliacaoUpdateRequestDTO(2, "Moderado"), admin);
+
+        assertThat(resultado.nota()).isEqualTo(2);
+    }
+
+    @Test
+    void devePermitirQueAdminRemovaAvaliacaoDeOutroUsuario() {
+        UsuarioPrincipal admin = new UsuarioPrincipal(99L, "admin@vapor.com", "hash", Role.ADMIN);
+        when(avaliacaoRepository.findById(100L)).thenReturn(Optional.of(avaliacaoExistente));
+
+        avaliacaoService.deletar(100L, admin);
+
+        verify(avaliacaoRepository).delete(avaliacaoExistente);
     }
 }

@@ -20,10 +20,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Entidade de Jogo — responsabilidade de Bruno Baldessar.
- * Declarada aqui para satisfazer a FK de Avaliacao.
- */
+/** Jogo disponível na loja: pertence a uma {@link Desenvolvedora} e a uma ou mais {@link Categoria}. */
 @Entity
 @Table(name = "jogo")
 @Getter

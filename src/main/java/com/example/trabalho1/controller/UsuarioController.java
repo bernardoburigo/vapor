@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.trabalho1.dto.AuthResponseDTO;
 import com.example.trabalho1.dto.LoginRequestDTO;
 import com.example.trabalho1.dto.UsuarioRequestDTO;
 import com.example.trabalho1.dto.UsuarioResponseDTO;
@@ -63,6 +65,15 @@ public class UsuarioController {
             {"timestamp": "2026-10-06T14:30:00", "status": 401, "error": "Unauthorized", "message": "Email ou senha inválidos", "fieldErrors": null}
             """;
 
+    private static final String EXEMPLO_ERRO_ACESSO_NEGADO = """
+            {"timestamp": "2026-10-06T14:30:00", "status": 403, "error": "Forbidden", "message": "Acesso negado: seu perfil não tem permissão para este recurso", "fieldErrors": null}
+            """;
+
+    private static final String EXEMPLO_LOGIN = """
+            {"token": "eyJhbGciOiJIUzI1NiJ9...", "tipo": "Bearer", "expiraEmSegundos": 3600,
+             "usuario": {"id": 1, "nome": "Bernardo Búrigo", "email": "bernardo@vapor.com", "role": "USER", "dataCadastro": "2026-10-06T14:30:00"}}
+            """;
+
     private final UsuarioService usuarioService;
 
     @Operation(summary = "Cadastrar usuário",
@@ -92,8 +103,9 @@ public class UsuarioController {
     }
 
     @Operation(summary = "Listar usuários",
-            description = "Lista usuários paginados. Parâmetros: page (padrão 0), size (padrão 20), sort (padrão nome,asc).")
+            description = "Lista usuários paginados. Parâmetros: page (padrão 0), size (padrão 20), sort (padrão nome,asc). Exige perfil ADMIN.")
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('ADMIN')")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Página de usuários",
                     content = @Content(mediaType = "application/json",
@@ -101,7 +113,11 @@ public class UsuarioController {
             @ApiResponse(responseCode = "401", description = "Token ausente ou inválido",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(name = "Não autenticado", value = EXEMPLO_ERRO_CREDENCIAIS)))
+                            examples = @ExampleObject(name = "Não autenticado", value = EXEMPLO_ERRO_CREDENCIAIS))),
+            @ApiResponse(responseCode = "403", description = "Perfil sem permissão (exige ADMIN)",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(name = "Acesso negado", value = EXEMPLO_ERRO_ACESSO_NEGADO)))
     })
     @GetMapping
     public ResponseEntity<Page<UsuarioResponseDTO>> listarTodos(
@@ -109,8 +125,10 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioService.listarTodos(pageable));
     }
 
-    @Operation(summary = "Buscar usuário por id", description = "Retorna os dados públicos de um usuário.")
+    @Operation(summary = "Buscar usuário por id",
+            description = "Retorna os dados públicos de um usuário. Permitido ao próprio usuário ou a um ADMIN.")
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Usuário encontrado",
                     content = @Content(mediaType = "application/json",
@@ -119,6 +137,10 @@ public class UsuarioController {
             @ApiResponse(responseCode = "401", description = "Token ausente ou inválido",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Só o próprio usuário ou um ADMIN pode consultar",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(name = "Acesso negado", value = EXEMPLO_ERRO_ACESSO_NEGADO))),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
@@ -131,8 +153,9 @@ public class UsuarioController {
     }
 
     @Operation(summary = "Atualizar usuário",
-            description = "Atualiza nome e email. A senha é trocada apenas se for informada.")
+            description = "Atualiza nome e email. A senha é trocada apenas se for informada. Permitido ao próprio usuário ou a um ADMIN.")
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Usuário atualizado",
                     content = @Content(mediaType = "application/json",
@@ -145,6 +168,10 @@ public class UsuarioController {
             @ApiResponse(responseCode = "401", description = "Token ausente ou inválido",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Só o próprio usuário ou um ADMIN pode atualizar",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(name = "Acesso negado", value = EXEMPLO_ERRO_ACESSO_NEGADO))),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
@@ -161,17 +188,26 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioService.atualizar(id, dto));
     }
 
-    @Operation(summary = "Remover usuário", description = "Remove permanentemente um usuário.")
+    @Operation(summary = "Remover usuário",
+            description = "Remove permanentemente um usuário. Retorna 409 se ele tiver avaliações. Exige perfil ADMIN.")
     @SecurityRequirement(name = "bearerAuth")
+    @PreAuthorize("hasRole('ADMIN')")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Usuário removido"),
             @ApiResponse(responseCode = "401", description = "Token ausente ou inválido",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Perfil sem permissão (exige ADMIN)",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(name = "Acesso negado", value = EXEMPLO_ERRO_ACESSO_NEGADO))),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(name = "Não encontrado", value = EXEMPLO_ERRO_NAO_ENCONTRADO)))
+                            examples = @ExampleObject(name = "Não encontrado", value = EXEMPLO_ERRO_NAO_ENCONTRADO))),
+            @ApiResponse(responseCode = "409", description = "Usuário possui avaliações",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class)))
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(
@@ -181,13 +217,14 @@ public class UsuarioController {
     }
 
     @Operation(summary = "Login",
-            description = "Valida email e senha e retorna os dados do usuário. Na etapa de JWT, passará também a retornar o token.")
+            description = "Valida email e senha e retorna um token JWT (válido por 1 hora por padrão) junto com os dados do usuário. "
+                    + "Envie o token nos demais endpoints no header Authorization: Bearer <token>.")
     @SecurityRequirements
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Credenciais válidas",
                     content = @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = UsuarioResponseDTO.class),
-                            examples = @ExampleObject(name = "Login", value = EXEMPLO_USUARIO))),
+                            schema = @Schema(implementation = AuthResponseDTO.class),
+                            examples = @ExampleObject(name = "Login", value = EXEMPLO_LOGIN))),
             @ApiResponse(responseCode = "400", description = "Campos obrigatórios ausentes",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class))),
@@ -197,7 +234,7 @@ public class UsuarioController {
                             examples = @ExampleObject(name = "Credenciais inválidas", value = EXEMPLO_ERRO_CREDENCIAIS)))
     })
     @PostMapping("/login")
-    public ResponseEntity<UsuarioResponseDTO> login(@Valid @RequestBody LoginRequestDTO dto) {
+    public ResponseEntity<AuthResponseDTO> login(@Valid @RequestBody LoginRequestDTO dto) {
         return ResponseEntity.ok(usuarioService.login(dto));
     }
 }

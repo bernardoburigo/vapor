@@ -10,10 +10,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Entidade de Desenvolvedora — responsabilidade de Bruno Souza.
- * Declarada aqui para satisfazer o relacionamento com Jogo.
- */
+/** Estúdio ou publicadora responsável por um ou mais {@link Jogo}. */
 @Entity
 @Table(name = "desenvolvedora")
 @Getter

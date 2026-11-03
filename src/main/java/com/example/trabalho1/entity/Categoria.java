@@ -10,10 +10,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Entidade de Categoria — responsabilidade de Gabriel Waltrick.
- * Declarada aqui para satisfazer o relacionamento N:N com Jogo.
- */
+/** Categoria (gênero) de jogos; relaciona-se N:N com {@link Jogo} via {@code jogo_categoria}. */
 @Entity
 @Table(name = "categoria")
 @Getter

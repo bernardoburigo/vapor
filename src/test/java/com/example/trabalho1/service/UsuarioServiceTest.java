@@ -25,6 +25,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.example.trabalho1.dto.AuthResponseDTO;
 import com.example.trabalho1.dto.LoginRequestDTO;
 import com.example.trabalho1.dto.UsuarioRequestDTO;
 import com.example.trabalho1.dto.UsuarioResponseDTO;
@@ -33,7 +34,9 @@ import com.example.trabalho1.entity.Role;
 import com.example.trabalho1.entity.Usuario;
 import com.example.trabalho1.exception.BusinessException;
 import com.example.trabalho1.exception.ResourceNotFoundException;
+import com.example.trabalho1.repository.AvaliacaoRepository;
 import com.example.trabalho1.repository.UsuarioRepository;
+import com.example.trabalho1.security.JwtService;
 
 @ExtendWith(MockitoExtension.class)
 class UsuarioServiceTest {
@@ -42,7 +45,13 @@ class UsuarioServiceTest {
     private UsuarioRepository usuarioRepository;
 
     @Mock
+    private AvaliacaoRepository avaliacaoRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private JwtService jwtService;
 
     @InjectMocks
     private UsuarioService usuarioService;
@@ -159,9 +168,15 @@ class UsuarioServiceTest {
         when(usuarioRepository.findByEmail(dto.email())).thenReturn(Optional.of(usuarioExistente));
         when(passwordEncoder.matches(dto.senha(), usuarioExistente.getSenha())).thenReturn(true);
 
-        UsuarioResponseDTO resultado = usuarioService.login(dto);
+        when(jwtService.gerarToken(usuarioExistente)).thenReturn("token-jwt");
+        when(jwtService.getValidadeEmSegundos()).thenReturn(3600L);
 
-        assertThat(resultado.email()).isEqualTo("bernardo@vapor.com");
+        AuthResponseDTO resultado = usuarioService.login(dto);
+
+        assertThat(resultado.token()).isEqualTo("token-jwt");
+        assertThat(resultado.tipo()).isEqualTo("Bearer");
+        assertThat(resultado.expiraEmSegundos()).isEqualTo(3600L);
+        assertThat(resultado.usuario().email()).isEqualTo("bernardo@vapor.com");
     }
 
     @Test
@@ -174,6 +189,8 @@ class UsuarioServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getStatus())
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        verify(jwtService, never()).gerarToken(any());
     }
 
     @Test
@@ -183,5 +200,65 @@ class UsuarioServiceTest {
 
         assertThatThrownBy(() -> usuarioService.login(dto))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void deveNormalizarEmailAoCriar() {
+        UsuarioRequestDTO dto = new UsuarioRequestDTO("Bernardo", "  Bernardo@Vapor.COM ", "senha123");
+        when(usuarioRepository.existsByEmail("bernardo@vapor.com")).thenReturn(false);
+        when(passwordEncoder.encode("senha123")).thenReturn("hash-novo");
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UsuarioResponseDTO resultado = usuarioService.criar(dto);
+
+        assertThat(resultado.email()).isEqualTo("bernardo@vapor.com");
+    }
+
+    @Test
+    void deveDetectarEmailDuplicadoIgnorandoMaiusculas() {
+        UsuarioRequestDTO dto = new UsuarioRequestDTO("Outro", "BERNARDO@VAPOR.COM", "senha123");
+        when(usuarioRepository.existsByEmail("bernardo@vapor.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> usuarioService.criar(dto))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void deveLancarConflitoAoAtualizarParaEmailDeOutroUsuario() {
+        UsuarioUpdateRequestDTO dto = new UsuarioUpdateRequestDTO("Bernardo", "outro@vapor.com", null);
+        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuarioExistente));
+        when(usuarioRepository.existsByEmail("outro@vapor.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> usuarioService.atualizar(1L, dto))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(usuarioRepository, never()).save(any());
+    }
+
+    @Test
+    void deveLancarConflitoAoDeletarUsuarioComAvaliacoes() {
+        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuarioExistente));
+        when(avaliacaoRepository.existsByUsuarioId(1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> usuarioService.deletar(1L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(usuarioRepository, never()).delete(any());
+    }
+
+    @Test
+    void deveLogarIgnorandoMaiusculasNoEmail() {
+        LoginRequestDTO dto = new LoginRequestDTO(" Bernardo@Vapor.com ", "senha123");
+        when(usuarioRepository.findByEmail("bernardo@vapor.com")).thenReturn(Optional.of(usuarioExistente));
+        when(passwordEncoder.matches("senha123", "hash-antigo")).thenReturn(true);
+        when(jwtService.gerarToken(usuarioExistente)).thenReturn("token-jwt");
+
+        assertThat(usuarioService.login(dto).usuario().email()).isEqualTo("bernardo@vapor.com");
     }
 }

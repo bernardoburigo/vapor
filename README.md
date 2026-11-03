@@ -1,6 +1,10 @@
 # VAPOR
 
-API REST da plataforma de distribuição digital de jogos VAPOR, inspirada na Steam. O planejamento e a modelagem estão em [docs/01-planejamento-e-modelagem.md](docs/01-planejamento-e-modelagem.md).
+API REST da plataforma de distribuição digital de jogos VAPOR, inspirada na Steam. Jogadores se cadastram, exploram um catálogo de jogos organizado por categorias e desenvolvedoras e avaliam o que jogaram; cada jogo acumula uma nota média pública.
+
+Stack: Java 21, Spring Boot 4, Spring Data JPA, Spring Security com JWT, PostgreSQL, Flyway, Lombok e Swagger (springdoc).
+
+O planejamento e a modelagem estão em [docs/01-planejamento-e-modelagem.md](docs/01-planejamento-e-modelagem.md). O estado da implementação e o plano de execução estão em [docs/02-status-do-sistema.md](docs/02-status-do-sistema.md) e [docs/03-plano-de-execucao.md](docs/03-plano-de-execucao.md).
 
 ## Pré-requisitos
 
@@ -8,6 +12,24 @@ API REST da plataforma de distribuição digital de jogos VAPOR, inspirada na St
 - Docker, para subir o PostgreSQL (ou PostgreSQL 12 a 17 instalado localmente)
 
 Não é preciso instalar o Maven: o projeto usa o Maven Wrapper (`mvnw`).
+
+## Início rápido
+
+```bash
+docker compose up -d      # sobe o PostgreSQL
+./mvnw spring-boot:run    # sobe a API em http://localhost:8081
+```
+
+Depois, abra o Swagger UI em http://localhost:8081/swagger-ui/index.html. Para testar os endpoints protegidos: faça login em `POST /api/usuarios/login`, copie o `token`, clique em **Authorize** e cole o token.
+
+## Credenciais
+
+| Para quê | Usuário | Senha |
+|---|---|---|
+| Login na API como ADMIN | `admin@vapor.com` | `admin123` |
+| PostgreSQL (desenvolvimento) | `postgres` | `postgres` (banco `trabalho1`, porta `5434`) |
+
+O ADMIN é criado automaticamente na primeira inicialização, caso ainda não exista. Usuários cadastrados por `POST /api/usuarios` sempre têm o perfil `USER`. **Essas credenciais são só para desenvolvimento:** em produção, defina `APP_ADMIN_EMAIL`, `APP_ADMIN_SENHA` e `JWT_SECRET` (veja [Variáveis de ambiente](#variáveis-de-ambiente)).
 
 ## Banco de dados
 
@@ -17,7 +39,7 @@ O banco roda em um container Docker definido no `docker-compose.yml` da raiz:
 docker compose up -d
 ```
 
-O PostgreSQL 16 fica disponível em `localhost:5434`. Credenciais de desenvolvimento: usuário `postgres`, senha `postgres`, banco `trabalho1`.
+O PostgreSQL 16 fica disponível em `localhost:5434`.
 
 | Comando | Efeito |
 |---|---|
@@ -36,7 +58,189 @@ POSTGRES_PORT=5435 docker compose up -d
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5435/trabalho1 ./mvnw spring-boot:run
 ```
 
-## Scripts
+### Migrations
+
+- `V1__create_usuario.sql`: tabela `usuario`
+- `V2__create_avaliacao.sql`: tabelas `desenvolvedora`, `categoria`, `jogo`, `jogo_categoria` e `avaliacao` (o nome do arquivo é histórico; ele cria as cinco tabelas e **não deve ser renomeado**, porque o Flyway guarda o checksum do arquivo)
+
+## Autenticação e autorização
+
+A API é stateless: não há sessão no servidor. O login devolve um token JWT (HS256, válido por 1 hora por padrão) que deve ser enviado em toda requisição protegida:
+
+```
+Authorization: Bearer <token>
+```
+
+O usuário é recarregado do banco a cada requisição, então um usuário removido perde o acesso na hora, sem esperar o token expirar. Senhas são armazenadas com BCrypt.
+
+| Recurso | Sem login | USER | ADMIN |
+|---|---|---|---|
+| Cadastro e login (`POST /api/usuarios`, `POST /api/usuarios/login`) | ✅ | ✅ | ✅ |
+| Swagger e `/v3/api-docs` | ✅ | ✅ | ✅ |
+| Ler jogos, categorias, desenvolvedoras e avaliações (`GET`) | ✅ | ✅ | ✅ |
+| Criar, alterar e remover jogos, categorias e desenvolvedoras | ❌ | ❌ | ✅ |
+| Avaliar um jogo (`POST /api/avaliacoes`) | ❌ | ✅ | ✅ |
+| Alterar ou remover uma avaliação | ❌ | só as próprias | qualquer uma |
+| Ver ou alterar um usuário (`GET`/`PUT /api/usuarios/{id}`) | ❌ | só o próprio | qualquer um |
+| Listar ou remover usuários (`GET /api/usuarios`, `DELETE`) | ❌ | ❌ | ✅ |
+
+Erros de segurança usam o mesmo formato dos demais erros: **401** quando o token está ausente, inválido ou expirado; **403** quando o usuário está logado, mas o perfil não permite a operação.
+
+## Endpoints
+
+Base: `http://localhost:8081/api`. A documentação completa, com exemplos e todos os códigos de resposta, está no Swagger UI.
+
+| Recurso | Endpoints |
+|---|---|
+| Usuários | `POST /usuarios`, `POST /usuarios/login`, `GET /usuarios` (paginado), `GET`/`PUT`/`DELETE /usuarios/{id}` |
+| Desenvolvedoras | `POST`/`GET /desenvolvedoras` (filtros `?nome=` e `?paisOrigem=`), `GET`/`PUT`/`DELETE /desenvolvedoras/{id}` |
+| Categorias | `POST`/`GET /categorias` (filtro `?nome=`), `GET`/`PUT`/`DELETE /categorias/{id}` |
+| Jogos | `POST /jogos`, `GET /jogos` (paginado; filtros `?categoriaId=`, `?desenvolvedoraId=` e `?titulo=`, combináveis), `GET`/`PUT`/`DELETE /jogos/{id}` |
+| Avaliações | `POST`/`GET /avaliacoes` (filtros `?jogoId=` e `?usuarioId=`), `GET`/`PUT`/`DELETE /avaliacoes/{id}` |
+
+Regras de negócio:
+
+- Um usuário só avalia o mesmo jogo uma vez (**409** se repetir). A nota vai de 1 a 5.
+- Todo jogo tem uma desenvolvedora e ao menos uma categoria.
+- `GET /jogos` e `GET /jogos/{id}` retornam `notaMedia` (uma casa decimal; `null` se não houver avaliações) e `totalAvaliacoes`.
+- Não é possível remover (**409**) uma desenvolvedora ou categoria que tenha jogos, um jogo que tenha avaliações, nem um usuário que tenha avaliações.
+- Nomes de desenvolvedoras e de categorias são únicos, sem diferenciar maiúsculas de minúsculas. E-mails são guardados em minúsculas.
+
+## Exemplos de requisições e respostas
+
+### Login
+
+```bash
+curl -X POST http://localhost:8081/api/usuarios/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@vapor.com","senha":"admin123"}'
+```
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "tipo": "Bearer",
+  "expiraEmSegundos": 3600,
+  "usuario": {
+    "id": 1,
+    "nome": "Administrador",
+    "email": "admin@vapor.com",
+    "role": "ADMIN",
+    "dataCadastro": "2026-11-02T21:32:32.021737"
+  }
+}
+```
+
+### Cadastrar usuário (público)
+
+```bash
+curl -X POST http://localhost:8081/api/usuarios \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"Bernardo Búrigo","email":"bernardo@vapor.com","senha":"senha123"}'
+```
+
+Resposta `201 Created`, com o header `Location: /api/usuarios/{id}`:
+
+```json
+{
+  "id": 2,
+  "nome": "Bernardo Búrigo",
+  "email": "bernardo@vapor.com",
+  "role": "USER",
+  "dataCadastro": "2026-11-02T21:35:45.303694"
+}
+```
+
+### Criar jogo (ADMIN)
+
+```bash
+curl -X POST http://localhost:8081/api/jogos \
+  -H "Authorization: Bearer $TOKEN_ADMIN" -H "Content-Type: application/json" \
+  -d '{"titulo":"Half-Life 3","descricao":"O retorno de Gordon Freeman","preco":199.90,
+       "dataLancamento":"2026-11-15","desenvolvedoraId":1,"categoriaIds":[1]}'
+```
+
+Resposta `201 Created`:
+
+```json
+{
+  "id": 1,
+  "titulo": "Half-Life 3",
+  "descricao": "O retorno de Gordon Freeman",
+  "preco": 199.9,
+  "dataLancamento": "2026-11-15",
+  "desenvolvedora": { "id": 1, "nome": "Valve Corporation" },
+  "categorias": [{ "id": 1, "nome": "RPG", "descricao": "Jogos de interpretação de papéis" }],
+  "notaMedia": null,
+  "totalAvaliacoes": 0
+}
+```
+
+### Avaliar um jogo (usuário logado)
+
+O autor é o usuário do token, não vai no corpo.
+
+```bash
+curl -X POST http://localhost:8081/api/avaliacoes \
+  -H "Authorization: Bearer $TOKEN_USER" -H "Content-Type: application/json" \
+  -d '{"jogoId":1,"nota":5,"comentario":"Obra-prima!"}'
+```
+
+Resposta `201 Created`:
+
+```json
+{
+  "id": 1,
+  "usuarioId": 2,
+  "usuarioNome": "Bernardo Búrigo",
+  "jogoId": 1,
+  "jogoTitulo": "Half-Life 3",
+  "nota": 5,
+  "comentario": "Obra-prima!",
+  "dataAvaliacao": "2026-11-02T21:35:45.502394"
+}
+```
+
+### Listar jogos de uma categoria (público)
+
+```bash
+curl "http://localhost:8081/api/jogos?categoriaId=1&page=0&size=20"
+```
+
+```json
+{
+  "content": [ { "id": 1, "titulo": "Half-Life 3", "notaMedia": 5.0, "totalAvaliacoes": 1 } ],
+  "page": { "size": 20, "number": 0, "totalElements": 1, "totalPages": 1 }
+}
+```
+
+(Em cada item de `content`, os demais campos são os mesmos do exemplo de criação de jogo.)
+
+### Formato de erro
+
+Todos os erros seguem o mesmo formato. Validação (`400`) inclui `fieldErrors`:
+
+```json
+{
+  "timestamp": "2026-11-02T21:35:45.573409435",
+  "status": 409,
+  "error": "Conflict",
+  "message": "Usuário já avaliou este jogo",
+  "fieldErrors": null
+}
+```
+
+```json
+{
+  "timestamp": "2026-11-02T21:35:45.430412442",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Dados inválidos",
+  "fieldErrors": { "email": "Email inválido", "senha": "Senha deve ter entre 6 e 100 caracteres" }
+}
+```
+
+## Comandos
 
 Todos os comandos são executados na raiz do projeto. No Windows, substitua `./mvnw` por `mvnw.cmd`.
 
@@ -44,62 +248,73 @@ Todos os comandos são executados na raiz do projeto. No Windows, substitua `./m
 |---|---|---|
 | Rodar o backend com Swagger | `./mvnw spring-boot:run` | Sobe a API em modo de desenvolvimento |
 | Rodar os testes | `./mvnw test` | Inclui testes de integração, que usam o banco real: o PostgreSQL precisa estar no ar |
-| Gerar o jar executável | `./mvnw clean package` | Gera `target/trabalho1-0.0.1-SNAPSHOT.jar` |
+| Gerar o jar executável | `./mvnw clean package` | Roda os testes e gera `target/trabalho1-0.0.1-SNAPSHOT.jar` |
 | Rodar o jar gerado | `java -jar target/trabalho1-0.0.1-SNAPSHOT.jar` | Precisa de `package` antes |
 | Limpar a pasta de build | `./mvnw clean` | Remove `target/` |
 
-### Backend + Swagger
+Com `java -jar`, você pode sobrescrever propriedades pela linha de comando:
 
 ```bash
-./mvnw spring-boot:run
+java -jar target/trabalho1-0.0.1-SNAPSHOT.jar --server.port=8082 --spring.datasource.url=jdbc:postgresql://localhost:5434/trabalho1
 ```
 
-Com a aplicação no ar (porta padrão `8081`):
+Endereços com a aplicação no ar (porta padrão `8081`):
 
 - Swagger UI: http://localhost:8081/swagger-ui/index.html
 - Especificação OpenAPI (JSON): http://localhost:8081/v3/api-docs
-- Base da API de usuários: http://localhost:8081/api/usuarios
 
-Os endpoints de `Usuario` estão documentados no Swagger, com exemplos de requisição e resposta. Os marcados com cadeado (`bearerAuth`) exigirão token JWT quando a autenticação for implementada; cadastro e login são públicos.
-
-### Testes
+## Testes
 
 ```bash
 ./mvnw test
 ```
 
-### Jar executável
+A suíte cobre as regras de negócio dos services (com mocks), os controllers de ponta a ponta contra o PostgreSQL real (com rollback ao final de cada teste), a segurança (401, 403, token expirado, adulterado, usuário removido, dono ou ADMIN) e a documentação OpenAPI.
 
-```bash
-./mvnw clean package
-java -jar target/trabalho1-0.0.1-SNAPSHOT.jar
+## Estrutura de pastas
+
+```
+.
+├── docker-compose.yml            # PostgreSQL 16 para desenvolvimento
+├── pom.xml
+├── docs/                         # análise, status e plano de execução (+ PDFs do trabalho)
+└── src
+    ├── main
+    │   ├── java/com/example/trabalho1
+    │   │   ├── config/           # SecurityConfig, OpenApiConfig, AdminBootstrap, encoder BCrypt
+    │   │   ├── controller/       # endpoints REST e documentação Swagger
+    │   │   ├── dto/              # objetos de entrada e saída (nenhuma entity é exposta)
+    │   │   ├── entity/           # entidades JPA e enum Role
+    │   │   ├── exception/        # GlobalExceptionHandler (@RestControllerAdvice) e ErrorResponse
+    │   │   ├── repository/       # Spring Data JPA
+    │   │   ├── security/         # JwtService, filtro JWT, UserDetailsService, handlers 401/403
+    │   │   └── service/          # regras de negócio
+    │   └── resources
+    │       ├── application.properties
+    │       └── db/migration/     # migrations do Flyway
+    └── test/java/com/example/trabalho1   # testes unitários e de integração
 ```
 
-Com `java -jar`, você pode sobrescrever propriedades pela linha de comando:
-
-```bash
-java -jar target/trabalho1-0.0.1-SNAPSHOT.jar --server.port=8081 --spring.datasource.url=jdbc:postgresql://localhost:5434/trabalho1
-```
-
-### Migrations
-
-Não há script separado. Os arquivos em `src/main/resources/db/migration` são executados pelo Flyway na inicialização da aplicação, em ordem de versão:
-
-- `V1__create_usuario.sql`: tabela `usuario`
-- `V2__create_avaliacao.sql`: tabela `avaliacao`
+Fluxo de uma requisição: filtro JWT → `Controller` (valida o DTO com `@Valid`) → `Service` (regras de negócio) → `Repository` → PostgreSQL. Erros lançados em qualquer camada são convertidos em JSON pelo `GlobalExceptionHandler`.
 
 ## Variáveis de ambiente
 
-Os valores padrão estão em `src/main/resources/application.properties`. Para usar outra porta ou outro banco sem alterar o arquivo, defina variáveis de ambiente antes do comando:
+Os valores padrão estão em `src/main/resources/application.properties`. Para usar outra porta, outro banco ou outros segredos sem alterar o arquivo, defina variáveis de ambiente antes do comando:
 
-| Variável | Padrão | Exemplo |
+| Variável | Padrão | Para que serve |
 |---|---|---|
-| `SERVER_PORT` | `8081` | `SERVER_PORT=8082` |
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5434/trabalho1` | `jdbc:postgresql://localhost:5435/trabalho1` |
-| `POSTGRES_PORT` | `5434` (usada pelo `docker compose`) | `POSTGRES_PORT=5435` |
+| `SERVER_PORT` | `8081` | Porta da API |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5434/trabalho1` | URL do banco |
+| `POSTGRES_PORT` | `5434` | Porta exposta pelo `docker compose` |
+| `JWT_SECRET` | segredo de desenvolvimento | Chave de assinatura dos tokens. **Defina em produção**; precisa ter ao menos 32 bytes (32 caracteres ASCII) |
+| `JWT_EXPIRATION_MINUTES` | `60` | Validade do token |
+| `APP_ADMIN_EMAIL` | `admin@vapor.com` | E-mail do ADMIN criado na inicialização |
+| `APP_ADMIN_SENHA` | `admin123` | Senha do ADMIN criado na inicialização |
+| `APP_ADMIN_NOME` | `Administrador` | Nome do ADMIN criado na inicialização |
+| `APP_CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:4200,http://localhost:5173` | Origens do frontend liberadas no CORS |
 
 ```bash
-SERVER_PORT=8081 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5434/trabalho1 ./mvnw spring-boot:run
+SERVER_PORT=8082 JWT_SECRET=troque-por-um-segredo-longo-e-aleatorio-com-32-ou-mais ./mvnw spring-boot:run
 ```
 
 Com `spring-boot:run`, use variáveis de ambiente: propriedades passadas com `-D` ao Maven não chegam ao processo da aplicação.
@@ -115,4 +330,4 @@ Espaço reservado para o frontend, que ainda não foi iniciado.
 | Instalação das dependências | A definir |
 | Execução em desenvolvimento | A definir |
 | URL local | A definir |
-| Integração com a API | A definir (base em `http://localhost:8081/api`) |
+| Integração com a API | A definir (base em `http://localhost:8081/api`; CORS já liberado para as portas 3000, 4200 e 5173) |

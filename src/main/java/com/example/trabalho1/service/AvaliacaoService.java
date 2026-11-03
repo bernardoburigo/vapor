@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.example.trabalho1.dto.AvaliacaoRequestDTO;
 import com.example.trabalho1.dto.AvaliacaoResponseDTO;
@@ -16,9 +17,12 @@ import com.example.trabalho1.exception.ResourceNotFoundException;
 import com.example.trabalho1.repository.AvaliacaoRepository;
 import com.example.trabalho1.repository.JogoRepository;
 import com.example.trabalho1.repository.UsuarioRepository;
+import com.example.trabalho1.security.UsuarioPrincipal;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AvaliacaoService {
@@ -27,11 +31,13 @@ public class AvaliacaoService {
     private final UsuarioRepository usuarioRepository;
     private final JogoRepository jogoRepository;
 
-    public AvaliacaoResponseDTO criar(AvaliacaoRequestDTO dto) {
-        Usuario usuario = buscarUsuarioPorId(dto.usuarioId());
+    /** Cria a avaliação do usuário autenticado ({@code usuarioId} vem do token, nunca do corpo da requisição). */
+    @Transactional
+    public AvaliacaoResponseDTO criar(Long usuarioId, AvaliacaoRequestDTO dto) {
+        Usuario usuario = buscarUsuarioPorId(usuarioId);
         Jogo jogo = buscarJogoPorId(dto.jogoId());
 
-        if (avaliacaoRepository.existsByUsuarioIdAndJogoId(dto.usuarioId(), dto.jogoId())) {
+        if (avaliacaoRepository.existsByUsuarioIdAndJogoId(usuarioId, dto.jogoId())) {
             throw new BusinessException(
                     "Usuário já avaliou este jogo", HttpStatus.CONFLICT);
         }
@@ -42,19 +48,25 @@ public class AvaliacaoService {
         avaliacao.setNota(dto.nota());
         avaliacao.setComentario(dto.comentario());
 
-        return AvaliacaoResponseDTO.fromEntity(avaliacaoRepository.save(avaliacao));
+        Avaliacao salva = avaliacaoRepository.save(avaliacao);
+        log.info("Avaliação criada: id={}, usuarioId={}, jogoId={}, nota={}",
+                salva.getId(), usuario.getId(), jogo.getId(), salva.getNota());
+        return AvaliacaoResponseDTO.fromEntity(salva);
     }
 
+    @Transactional(readOnly = true)
     public List<AvaliacaoResponseDTO> listarTodas() {
         return avaliacaoRepository.findAll().stream()
                 .map(AvaliacaoResponseDTO::fromEntity)
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public AvaliacaoResponseDTO buscarPorId(Long id) {
         return AvaliacaoResponseDTO.fromEntity(buscarEntidadePorId(id));
     }
 
+    @Transactional(readOnly = true)
     public List<AvaliacaoResponseDTO> listarPorJogo(Long jogoId) {
         buscarJogoPorId(jogoId); // garante que o jogo existe
         return avaliacaoRepository.findAllByJogoId(jogoId).stream()
@@ -62,6 +74,7 @@ public class AvaliacaoService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<AvaliacaoResponseDTO> listarPorUsuario(Long usuarioId) {
         buscarUsuarioPorId(usuarioId); // garante que o usuário existe
         return avaliacaoRepository.findAllByUsuarioId(usuarioId).stream()
@@ -69,23 +82,39 @@ public class AvaliacaoService {
                 .toList();
     }
 
-    public AvaliacaoResponseDTO atualizar(Long id, AvaliacaoUpdateRequestDTO dto) {
+    @Transactional
+    public AvaliacaoResponseDTO atualizar(Long id, AvaliacaoUpdateRequestDTO dto, UsuarioPrincipal solicitante) {
         Avaliacao avaliacao = buscarEntidadePorId(id);
+        garantirDonoOuAdmin(avaliacao, solicitante, "alterar");
 
         avaliacao.setNota(dto.nota());
         avaliacao.setComentario(dto.comentario());
 
-        return AvaliacaoResponseDTO.fromEntity(avaliacaoRepository.save(avaliacao));
+        Avaliacao salva = avaliacaoRepository.save(avaliacao);
+        log.info("Avaliação atualizada: id={}, nota={}", salva.getId(), salva.getNota());
+        return AvaliacaoResponseDTO.fromEntity(salva);
     }
 
-    public void deletar(Long id) {
+    @Transactional
+    public void deletar(Long id, UsuarioPrincipal solicitante) {
         Avaliacao avaliacao = buscarEntidadePorId(id);
+        garantirDonoOuAdmin(avaliacao, solicitante, "remover");
         avaliacaoRepository.delete(avaliacao);
+        log.info("Avaliação removida: id={}", id);
     }
 
     // -------------------------------------------------------------------------
     // Helpers privados
     // -------------------------------------------------------------------------
+
+    /** Só o autor da avaliação ou um ADMIN pode alterá-la ou removê-la. */
+    private void garantirDonoOuAdmin(Avaliacao avaliacao, UsuarioPrincipal solicitante, String acao) {
+        boolean dono = avaliacao.getUsuario().getId().equals(solicitante.getId());
+        if (!dono && !solicitante.isAdmin()) {
+            throw new BusinessException(
+                    "Você só pode " + acao + " as suas próprias avaliações", HttpStatus.FORBIDDEN);
+        }
+    }
 
     private Avaliacao buscarEntidadePorId(Long id) {
         return avaliacaoRepository.findById(id)

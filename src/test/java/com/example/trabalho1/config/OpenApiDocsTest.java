@@ -29,6 +29,32 @@ class OpenApiDocsTest {
     }
 
     @Test
+    void deveDocumentarOsCincoRecursosDaApi() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/usuarios']").exists())
+                .andExpect(jsonPath("$.paths['/api/desenvolvedoras']").exists())
+                .andExpect(jsonPath("$.paths['/api/desenvolvedoras/{id}']").exists())
+                .andExpect(jsonPath("$.paths['/api/categorias']").exists())
+                .andExpect(jsonPath("$.paths['/api/categorias/{id}']").exists())
+                .andExpect(jsonPath("$.paths['/api/jogos']").exists())
+                .andExpect(jsonPath("$.paths['/api/jogos/{id}']").exists())
+                .andExpect(jsonPath("$.paths['/api/avaliacoes']").exists())
+                .andExpect(jsonPath("$.paths['/api/avaliacoes/{id}']").exists());
+    }
+
+    @Test
+    void todosOsEndpointsTemTagEResumo() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/jogos'].get.tags[0]", is("Jogos")))
+                .andExpect(jsonPath("$.paths['/api/categorias'].post.tags[0]", is("Categorias")))
+                .andExpect(jsonPath("$.paths['/api/desenvolvedoras'].get.tags[0]", is("Desenvolvedoras")))
+                .andExpect(jsonPath("$.paths['/api/avaliacoes'].post.tags[0]", is("Avaliações")))
+                .andExpect(jsonPath("$.paths['/api/avaliacoes'].post.summary", is("Avaliar jogo")));
+    }
+
+    @Test
     void deveDeclararEsquemaBearerJwt() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
@@ -49,6 +75,27 @@ class OpenApiDocsTest {
     }
 
     @Test
+    void escritasDoCatalogoEDasAvaliacoesExigemTokenELeiturasSaoPublicas() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                // escrita: bearerAuth
+                .andExpect(jsonPath("$.paths['/api/jogos'].post.security[0].bearerAuth").exists())
+                .andExpect(jsonPath("$.paths['/api/jogos/{id}'].put.security[0].bearerAuth").exists())
+                .andExpect(jsonPath("$.paths['/api/jogos/{id}'].delete.security[0].bearerAuth").exists())
+                .andExpect(jsonPath("$.paths['/api/categorias'].post.security[0].bearerAuth").exists())
+                .andExpect(jsonPath("$.paths['/api/desenvolvedoras'].post.security[0].bearerAuth").exists())
+                .andExpect(jsonPath("$.paths['/api/avaliacoes'].post.security[0].bearerAuth").exists())
+                .andExpect(jsonPath("$.paths['/api/avaliacoes/{id}'].put.security[0].bearerAuth").exists())
+                .andExpect(jsonPath("$.paths['/api/avaliacoes/{id}'].delete.security[0].bearerAuth").exists())
+                // leitura: sem cadeado
+                .andExpect(jsonPath("$.paths['/api/jogos'].get.security").doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/jogos/{id}'].get.security").doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/categorias'].get.security").doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/desenvolvedoras'].get.security").doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/avaliacoes'].get.security").doesNotExist());
+    }
+
+    @Test
     void respostaDeUsuarioNaDocumentacaoNaoExpoeSenha() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
@@ -62,6 +109,33 @@ class OpenApiDocsTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paths['/api/usuarios/{id}'].get.responses['404']").exists())
                 .andExpect(jsonPath("$.paths['/api/usuarios'].post.responses['409']").exists())
+                .andExpect(jsonPath("$.paths['/api/jogos'].post.responses['403']").exists())
+                .andExpect(jsonPath("$.paths['/api/avaliacoes/{id}'].put.responses['403']").exists())
+                .andExpect(jsonPath("$.paths['/api/avaliacoes'].post.responses['409']").exists())
                 .andExpect(jsonPath("$.components.schemas.ErrorResponse.properties.message").exists());
+    }
+
+    @Test
+    void loginDocumentaOTokenJwtRetornado() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.components.schemas.AuthResponseDTO.properties.token").exists())
+                .andExpect(jsonPath("$.components.schemas.AuthResponseDTO.properties.usuario").exists());
+    }
+
+    @Test
+    void avaliacaoNaoPedeOUsuarioNoCorpoPoisVemDoToken() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.components.schemas.AvaliacaoRequestDTO.properties.jogoId").exists())
+                .andExpect(jsonPath("$.components.schemas.AvaliacaoRequestDTO.properties.usuarioId").doesNotExist());
+    }
+
+    @Test
+    void jogoDocumentaNotaMediaETotalDeAvaliacoes() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.components.schemas.JogoResponseDTO.properties.notaMedia").exists())
+                .andExpect(jsonPath("$.components.schemas.JogoResponseDTO.properties.totalAvaliacoes").exists());
     }
 }

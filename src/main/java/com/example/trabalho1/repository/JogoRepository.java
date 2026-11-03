@@ -1,14 +1,13 @@
 package com.example.trabalho1.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import com.example.trabalho1.entity.Jogo;
 
-/**
- * Repositório de Jogo — responsabilidade de Bruno Baldessar.
- * Declarado aqui para satisfazer a injeção em AvaliacaoService.
- */
-public interface JogoRepository extends JpaRepository<Jogo, Long> {
+public interface JogoRepository extends JpaRepository<Jogo, Long>, JpaSpecificationExecutor<Jogo> {
 
     boolean existsByDesenvolvedoraId(Long desenvolvedoraId);
+
+    boolean existsByCategoriasId(Long categoriaId);
 }
